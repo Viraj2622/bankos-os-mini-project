@@ -1,0 +1,822 @@
+<title>BankOS Platform</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: fixed sidebar of modules + a working column. Colour carries transaction type everywhere (fraud red, withdrawal amber, transfer blue, inquiry violet, deposit green). */
+:root{
+  --bg:#EBEFF2; --surface:#FFFFFF; --sunk:#F3F6F8; --line:#D8DFE5; --ink:#0F1A24; --muted:#586775;
+  --accent:#0B6E8A; --accent-ink:#FFFFFF; --side:#0C1620; --side-ink:#C5D0D9; --side-on:#16293A; --side-line:#1D2D3B;
+  --ok:#16794F; --warn:#9A5B00; --bad:#B8322E; --info:#0B6E8A;
+  --ok-bg:#E0F2E9; --warn-bg:#FBEBCB; --bad-bg:#F9DEDC; --info-bg:#DCEEF4;
+  --t-fraud:#C93B3B; --t-withdrawal:#C97A12; --t-transfer:#2F6FCF; --t-inquiry:#7A5FC2; --t-deposit:#1E8E5B;
+  --display:'Bricolage Grotesque','IBM Plex Sans',system-ui,sans-serif; --body:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#080D12; --surface:#101820; --sunk:#0B1218; --line:#1F2C38; --ink:#E5ECF1; --muted:#8FA1AF;
+  --accent:#4BC0DE; --accent-ink:#04202A; --side:#0A1118; --side-ink:#9FB0BD; --side-on:#15222E; --side-line:#182632;
+  --ok:#4CCB93; --warn:#F0B14A; --bad:#F27B76; --info:#4BC0DE; --ok-bg:#12302356; --warn-bg:#3A2C0F66; --bad-bg:#3D181766; --info-bg:#0F2E3A66;
+  --t-fraud:#F26E6E; --t-withdrawal:#F0A04A; --t-transfer:#6AA4F4; --t-inquiry:#A996EC; --t-deposit:#46CE8F; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#080D12; --surface:#101820; --sunk:#0B1218; --line:#1F2C38; --ink:#E5ECF1; --muted:#8FA1AF;
+  --accent:#4BC0DE; --accent-ink:#04202A; --side:#0A1118; --side-ink:#9FB0BD; --side-on:#15222E; --side-line:#182632;
+  --ok:#4CCB93; --warn:#F0B14A; --bad:#F27B76; --info:#4BC0DE; --ok-bg:#12302356; --warn-bg:#3A2C0F66; --bad-bg:#3D181766; --info-bg:#0F2E3A66;
+  --t-fraud:#F26E6E; --t-withdrawal:#F0A04A; --t-transfer:#6AA4F4; --t-inquiry:#A996EC; --t-deposit:#46CE8F; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%}
+.side{background:var(--side);color:var(--side-ink);padding:18px 12px;position:sticky;top:0;align-self:start;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:18px;overflow:auto}
+.brand{display:flex;gap:10px;align-items:center;padding:2px 6px}
+.brand b{display:block;font-family:var(--display);font-size:17px;color:#fff;letter-spacing:.2px;line-height:1.1}
+.brand small{font-size:11px;color:var(--side-ink)}
+.logo{width:36px;height:36px;border-radius:8px;border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:11px;font-weight:600;letter-spacing:.5px}
+nav{display:flex;flex-direction:column;gap:14px}
+.ng{display:flex;flex-direction:column;gap:2px}
+.gl{font-family:var(--mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6F8394;padding:0 8px 4px}
+.side nav button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:6px;color:var(--side-ink);cursor:pointer;font-size:13.5px;border-left:2px solid transparent}
+.side nav button:hover{background:var(--side-on)}
+.side nav button.on{background:var(--side-on);color:#fff;font-weight:600;border-left-color:var(--accent)}
+.sfoot{margin-top:auto;border-top:1px solid var(--side-line);padding-top:12px;display:flex;flex-direction:column}
+.sfoot b{color:#fff;font-weight:600}.sfoot small{color:var(--side-ink)}
+main{min-width:0;padding:0 max(20px,env(safe-area-inset-right,0px)) 40px 28px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 0;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5;border-bottom:1px solid var(--line)}
+.crumb{font-size:12px;color:var(--muted)}
+.page{display:flex;flex-direction:column;gap:16px;padding-top:20px;max-width:1240px}
+.phead{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap}
+.phead>div:first-child{min-width:0;max-width:680px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.phead h1{font-family:var(--display);font-size:30px;font-weight:700;letter-spacing:-.4px;line-height:1.1}
+.phead p{margin:8px 0 0;color:var(--muted);max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.card h2{font-family:var(--display);font-size:17px;font-weight:600;margin-bottom:12px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.card h2 small,.stage h3 small{font-family:var(--body);font-weight:400;font-size:12px;color:var(--muted)}
+h3{font-size:12px;font-family:var(--mono);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:500;margin-bottom:8px}
+.mt{margin-top:14px}.muted{color:var(--muted)}.grow{flex:1}
+.row{display:flex;gap:10px;align-items:center}.row.wrap{flex-wrap:wrap;align-items:flex-end}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpis.mini{margin:12px 0}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.kpi .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.kpi .val{font-family:var(--display);font-size:28px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:13px;font-family:var(--body);font-weight:500;color:var(--muted)}
+.kpi .val.ok{color:var(--ok)}.kpi .val.bad{color:var(--bad)}
+.kpi .note{font-size:12px;color:var(--muted)}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 13px;cursor:pointer;font-weight:500;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.pri:hover{filter:brightness(1.08)}
+.link{background:none;border:0;color:var(--accent);cursor:pointer;padding:10px 0 0;font-weight:500}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ib{background:var(--surface);border:1px solid var(--line);border-radius:7px;width:34px;height:34px;cursor:pointer;display:grid;place-items:center;font-size:12px}
+.ib:hover{border-color:var(--accent)}.ib.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);width:42px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex-wrap:wrap;background:var(--surface)}
+.seg button{background:none;border:0;padding:7px 12px;cursor:pointer;font-size:13px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.fld{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted)}
+input[type=number],select{background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-family:var(--mono);font-size:13px;width:70px}
+select{width:auto;font-family:var(--body)}
+input[type=range]{accent-color:var(--accent)}
+.pill{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+td .pill,.brow span .pill{margin-left:6px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.info{background:var(--info-bg);color:var(--info)}
+.chip{display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;padding:3px 9px;border-radius:6px;color:#fff;background:var(--c);animation:pop .28s ease-out}
+.chip.big{font-size:20px;padding:14px 22px;border-radius:9px;box-shadow:0 6px 18px -8px var(--c)}
+.chip.blocked{background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c);background-image:repeating-linear-gradient(135deg,transparent 0 4px,color-mix(in srgb,var(--c) 20%,transparent) 4px 8px)}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.chips{display:flex;gap:6px;flex-wrap:wrap;min-height:28px;align-items:center}
+.chips em,.empty p{color:var(--muted);font-style:normal;font-size:12.5px}
+.stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px}
+.stage{background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:170px;min-width:0}
+.stage h3{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin:0;color:var(--ink)}
+.stage .foot{margin-top:auto;color:var(--muted);font-size:11.5px}
+.stage.cpu{background:color-mix(in srgb,var(--accent) 8%,var(--sunk));border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.cpubox{min-height:62px;display:grid;place-items:center}
+.idle{font-family:var(--mono);color:var(--muted);border:1.5px dashed var(--line);border-radius:9px;padding:14px 22px;font-size:13px}
+.slots{display:flex;flex-direction:column;gap:5px}.slots.wide{flex-direction:row;flex-wrap:wrap;gap:8px}
+.slot{border:1.5px dashed var(--line);border-radius:6px;min-height:30px;min-width:56px;padding:2px 6px;display:flex;align-items:center;flex:1}
+.slot.full{border-style:solid;background:var(--surface)}
+.slots.wide .slot{min-height:54px;justify-content:center;flex:0 0 76px}
+.gauges{display:flex;flex-direction:column;gap:8px}
+.gauge{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;font-size:12px}
+.gtrack{height:8px;border-radius:99px;background:var(--line);overflow:hidden}.gfill{height:100%;background:var(--accent);transition:width .3s}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.legend i.blk{background-image:repeating-linear-gradient(135deg,transparent 0 2px,var(--muted) 2px 3px);border:1px solid var(--muted)}
+.player{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pbtns{display:flex;gap:6px}.scrub{flex:1;min-width:140px}
+.clock{font-size:13px;min-width:76px;font-weight:600}
+.speeds{display:inline-flex;gap:4px}.speeds button{background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;font-family:var(--mono)}
+.speeds button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.gantt-wrap{margin-top:6px}
+.gantt{display:flex;position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.gb{background:var(--c);color:#fff;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:600;border-right:2px solid var(--surface);min-width:2px;transition:opacity .25s}
+.gb.idle{background-image:repeating-linear-gradient(135deg,transparent 0 5px,var(--line) 5px 10px)}
+.gb.fut{opacity:.2}.gb.cur{box-shadow:inset 0 0 0 2px var(--ink)}
+.gcursor{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);pointer-events:none;transition:left .3s linear}
+.gticks{position:relative;height:18px;font-size:10.5px;color:var(--muted)}.gticks span{position:absolute;transform:translateX(-50%)}
+.memmap{display:flex;flex-direction:column;gap:6px}
+.mrow{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center}
+.mlbl{font-size:12px;font-weight:600}.mlbl small{display:block;font-weight:400;color:var(--muted);font-size:10.5px}
+.mbar{display:flex;height:28px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--sunk)}
+.mseg{display:grid;place-items:center;font-family:var(--mono);font-size:11px;min-width:1px;border-right:1px solid var(--surface)}
+.mseg.u{background:var(--c);color:#fff;font-weight:600}.mseg.h{color:var(--muted);background-image:repeating-linear-gradient(135deg,transparent 0 5px,var(--line) 5px 6px)}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:330px;overflow:auto}
+.log li{display:grid;grid-template-columns:auto 8px 1fr;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.log li:last-child{border:0}.log li>span:first-child{color:var(--muted);font-size:11.5px;min-width:18px}
+.log li i{width:7px;height:7px;border-radius:50%;background:var(--muted);align-self:center}
+.log li.done i,.log li.admit i{background:var(--ok)}.log li.deny i,.log li.wait i{background:var(--bad)}.log li.grant i,.log li.pre i{background:var(--warn)}.log li.arrive i,.log li.enq i{background:var(--info)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);font-weight:500;padding:7px 10px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;vertical-align:middle}
+tr.avg td{font-weight:600;border-bottom:0}tr.sel td{background:var(--info-bg)}tbody tr[onclick],tr.sel{cursor:pointer}
+table.edit td{padding:5px 6px}.neg{color:var(--bad);font-weight:600}
+.ins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.ins li{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:start;font-size:13.5px}
+.ok-line{margin:0 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.stg{position:relative;text-align:left;background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.stg:hover{border-color:var(--accent)}.stg .n{font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)}.stg b{font-family:var(--display);font-size:17px}.stg small{color:var(--muted);font-size:12px}
+.stg i{position:absolute;right:-13px;top:50%;transform:translateY(-50%);color:var(--muted);font-style:normal;z-index:1;background:var(--surface);border-radius:50%;width:16px;text-align:center;line-height:16px;font-size:11px}
+.bars{display:flex;flex-direction:column;gap:9px}
+.brow{display:grid;grid-template-columns:150px 1fr 48px;gap:10px;align-items:center;font-size:13px}.brow b{text-align:right}
+.btrack{height:10px;background:var(--sunk);border-radius:99px;overflow:hidden;border:1px solid var(--line)}.bfill{height:100%;background:var(--accent);border-radius:99px}
+.cpurow{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin:16px 0;padding:14px;background:var(--sunk);border:1px solid var(--line);border-radius:9px}
+.cpu1{text-align:center;min-width:130px}.cpu1 h3{text-align:center}
+.why{margin-top:12px;font-size:12.5px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;line-height:1.55}
+.code{font-family:var(--mono);font-size:12px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;margin:12px 0 0;white-space:pre}
+.code.sel{user-select:all}
+.av{background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px}.av.neg{border-color:var(--bad)}
+.pe{display:flex;align-items:flex-end;gap:4px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:44px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:20px}
+@media (max-width:1100px){.stages{grid-template-columns:repeat(3,minmax(0,1fr))}.three{grid-template-columns:1fr}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;flex-direction:column;gap:10px;padding:12px max(16px,env(safe-area-inset-left,0px))}
+  .side nav{flex-direction:row;overflow-x:auto;gap:12px}.ng{flex-direction:row;align-items:center;gap:2px}.gl,.sfoot{display:none}
+  .side nav button{white-space:nowrap;border-left:0;border-bottom:2px solid transparent}.side nav button.on{border-bottom-color:var(--accent)}
+  main{padding:0 max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px))}
+  .two,.flow{grid-template-columns:1fr}.stg i{display:none}.stages{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cpurow{grid-template-columns:1fr}.brow{grid-template-columns:110px 1fr 44px}.phead h1{font-size:26px}
+}
+@media (max-width:520px){.stages{grid-template-columns:1fr}.ins li{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+/* ===== BankOS engine: pure functions, no UI ===== */
+const Engine = (() => {
+  const cmpId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
+  const sum = (a) => a.reduce((s, v) => s + v, 0);
+  const vAdd = (a, b) => a.map((v, i) => v + b[i]);
+  const vSub = (a, b) => a.map((v, i) => v - b[i]);
+  const vLte = (a, b) => a.every((v, i) => v <= b[i]);
+  const zeros = (n) => Array(n).fill(0);
+
+  /* ---------- CPU scheduling (tick-based, one engine for all algorithms) ---------- */
+  const ALGOS = [
+    { id: 'fcfs', name: 'FCFS', full: 'First Come First Serve', pre: false, how: 'Runs transactions strictly in arrival order, each to completion.' },
+    { id: 'sjf', name: 'SJF', full: 'Shortest Job First', pre: false, how: 'Picks the ready transaction with the smallest burst; never interrupts a running one.' },
+    { id: 'srtf', name: 'SRTF', full: 'Shortest Remaining Time First', pre: true, how: 'Always runs the transaction with the least time left; a shorter arrival preempts.' },
+    { id: 'prio-np', name: 'Priority (NP)', full: 'Priority, non-preemptive', pre: false, how: 'Picks the best priority (lowest number) when the CPU frees up.' },
+    { id: 'prio-p', name: 'Priority (P)', full: 'Priority, preemptive', pre: true, how: 'A higher-priority arrival (e.g. a fraud check) interrupts the running transaction at once.' },
+    { id: 'rr', name: 'Round Robin', full: 'Round Robin', pre: true, how: 'Each transaction gets a fixed quantum in rotation, then rejoins the queue.' },
+  ];
+
+  function simulateCPU(algo, txns, q = 2) {
+    const rem = {}; txns.forEach((x) => (rem[x.id] = x.bt));
+    const queued = new Set(), rq = [], blocks = [];
+    const n = txns.length;
+    let t = 0, done = 0, prev = null, slice = 0;
+    const cap = sum(txns.map((x) => x.bt)) + Math.max(0, ...txns.map((x) => x.at)) + 5;
+    const np = algo === 'fcfs' || algo === 'sjf' || algo === 'prio-np';
+    while (done < n && t <= cap) {
+      let pick = null;
+      if (algo === 'rr') {
+        txns.filter((x) => x.at <= t && !queued.has(x.id)).sort((a, b) => a.at - b.at || cmpId(a, b)).forEach((x) => { queued.add(x.id); rq.push(x.id); });
+        if (prev !== null && slice >= q) { rq.push(prev); prev = null; }
+        if (prev !== null) pick = prev; else { pick = rq.shift() || null; slice = 0; }
+      } else if (np && prev !== null && rem[prev] > 0) {
+        pick = prev;
+      } else {
+        const ready = txns.filter((x) => x.at <= t && rem[x.id] > 0);
+        const key = { fcfs: (x) => x.at, sjf: (x) => x.bt, srtf: (x) => rem[x.id], 'prio-np': (x) => x.priority, 'prio-p': (x) => x.priority }[algo];
+        ready.sort((a, b) => key(a) - key(b) || a.at - b.at || cmpId(a, b));
+        pick = ready.length ? ready[0].id : null;
+      }
+      const pid = pick === null ? 'IDLE' : pick;
+      const last = blocks[blocks.length - 1];
+      if (last && last.pid === pid && last.end === t) last.end = t + 1; else blocks.push({ pid, start: t, end: t + 1 });
+      if (pick === null) { prev = null; slice = 0; } else {
+        rem[pick]--; slice++;
+        if (rem[pick] === 0) { done++; prev = null; slice = 0; } else prev = pick;
+      }
+      t++;
+    }
+    return { blocks, metrics: metricsFromBlocks(txns, blocks) };
+  }
+
+  function metricsFromBlocks(txns, blocks) {
+    const info = {}; txns.forEach((x) => (info[x.id] = { start: null, ct: 0 }));
+    blocks.forEach((b) => { if (b.pid === 'IDLE') return; if (info[b.pid].start === null) info[b.pid].start = b.start; info[b.pid].ct = Math.max(info[b.pid].ct, b.end); });
+    const rows = txns.map((x) => { const i = info[x.id]; const tat = i.ct - x.at; return { id: x.id, at: x.at, bt: x.bt, ct: i.ct, tat, wt: tat - x.bt, rt: (i.start === null ? 0 : i.start) - x.at }; });
+    const n = rows.length || 1, avg = (k) => rows.reduce((s, r) => s + r[k], 0) / n;
+    const total = blocks.length ? Math.max(...blocks.map((b) => b.end)) : 0;
+    const idle = sum(blocks.filter((b) => b.pid === 'IDLE').map((b) => b.end - b.start));
+    const busy = blocks.filter((b) => b.pid !== 'IDLE');
+    let ctx = 0; for (let i = 1; i < busy.length; i++) if (busy[i].pid !== busy[i - 1].pid) ctx++;
+    return { rows, avgWT: avg('wt'), avgTAT: avg('tat'), avgRT: avg('rt'), total, util: total ? ((total - idle) / total) * 100 : 0, throughput: total ? rows.length / total : 0, ctx };
+  }
+
+  /* ---------- Banker's algorithm ---------- */
+  function safety(procs, alloc, need, avail) {
+    let work = [...avail]; const fin = procs.map(() => false), seq = [], steps = [];
+    let prog = true;
+    while (prog) {
+      prog = false;
+      for (let i = 0; i < procs.length; i++) {
+        if (!fin[i] && vLte(need[i], work)) {
+          const before = [...work]; work = vAdd(work, alloc[i]); fin[i] = true; seq.push(procs[i]);
+          steps.push({ p: procs[i], need: need[i], before, after: [...work] }); prog = true;
+        }
+      }
+    }
+    return { safe: fin.every(Boolean), seq, steps };
+  }
+  function bankerRequest(procs, alloc, max, avail, i, req) {
+    const need = max.map((m, r) => vSub(m, alloc[r]));
+    if (!vLte(req, need[i])) return { ok: false, code: 'exceeds-need' };
+    if (!vLte(req, avail)) return { ok: false, code: 'unavailable' };
+    const nAlloc = alloc.map((row, r) => (r === i ? vAdd(row, req) : row));
+    const nAvail = vSub(avail, req);
+    const nNeed = need.map((row, r) => (r === i ? vSub(row, req) : row));
+    const s = safety(procs, nAlloc, nNeed, nAvail);
+    return s.safe ? { ok: true, code: 'granted', seq: s.seq, alloc: nAlloc, avail: nAvail } : { ok: false, code: 'unsafe' };
+  }
+
+  /* ---------- Memory: variable partitions inside fixed regions ---------- */
+  const newMem = (parts) => parts.map((size, id) => ({ id, size, holes: [{ off: 0, size }], used: [] }));
+  const cloneMem = (m) => m.map((p) => ({ id: p.id, size: p.size, holes: p.holes.map((h) => ({ ...h })), used: p.used.map((u) => ({ ...u })) }));
+  function findHole(m, size, fit) {
+    let best = null;
+    for (const p of m) for (const h of p.holes) {
+      if (h.size < size) continue;
+      if (fit === 'first') return { p, h };
+      if (!best || h.size < best.h.size) best = { p, h };
+    }
+    return best;
+  }
+  const memCanFit = (m, size, fit = 'first') => !!findHole(m, size, fit);
+  function memAlloc(m, id, size, fit) {
+    const f = findHole(m, size, fit); if (!f) return { ok: false };
+    const off = f.h.off; f.p.used.push({ id, off, size }); f.h.off += size; f.h.size -= size;
+    if (f.h.size === 0) f.p.holes.splice(f.p.holes.indexOf(f.h), 1);
+    return { ok: true, part: f.p.id, off, leftover: f.h.size, holeSize: f.h.size + size };
+  }
+  function memFree(m, id) {
+    for (const p of m) {
+      const i = p.used.findIndex((u) => u.id === id); if (i < 0) continue;
+      const u = p.used.splice(i, 1)[0]; p.holes.push({ off: u.off, size: u.size }); p.holes.sort((a, b) => a.off - b.off);
+      const merged = []; for (const h of p.holes) { const l = merged[merged.length - 1]; if (l && l.off + l.size === h.off) l.size += h.size; else merged.push({ ...h }); }
+      p.holes = merged; return true;
+    }
+    return false;
+  }
+  function memStats(m) {
+    const holes = m.flatMap((p) => p.holes.map((h) => h.size));
+    const free = sum(holes), largest = Math.max(0, ...holes);
+    return { free, largest, holes: holes.length, external: free ? (1 - largest / free) * 100 : 0, used: sum(m.flatMap((p) => p.used.map((u) => u.size))) };
+  }
+  function memBatch(parts, reqs, fit) {
+    const m = newMem(parts), log = [];
+    reqs.forEach((r) => { const a = memAlloc(m, r.id, r.mem, fit); log.push({ id: r.id, size: r.mem, ...a }); });
+    return { mem: m, log, stats: memStats(m), unserved: log.filter((l) => !l.ok).length };
+  }
+
+  /* ---------- Producer-consumer step (shared by the lab and the self-test) ---------- */
+  function syncTick(s, p, rnd) {
+    // s: {buf, produced, consumed, lost, dup, underflow, blocked, n}; p: {cap, consumers, pProd, pCons, safe, channels}
+    for (let c = 0; c < p.channels; c++) {
+      if (rnd() > p.pProd) continue;
+      if (s.buf.length >= p.cap) {
+        if (p.safe) { s.blocked++; s.log.unshift({ k: 'block', m: 'Producer blocked: empty = 0' }); }
+        else { s.buf.shift(); s.lost++; s.buf.push(`T${++s.n}`); s.produced++; s.log.unshift({ k: 'lost', m: 'Buffer overwritten: a transaction was lost' }); }
+      } else { const id = `T${++s.n}`; s.buf.push(id); s.produced++; s.log.unshift({ k: 'prod', m: `${p.chNames ? p.chNames[c % p.chNames.length] : 'Channel'} produced ${id}` }); }
+    }
+    for (let k = 0; k < p.consumers; k++) {
+      if (rnd() > p.pCons) continue;
+      if (!s.buf.length) { if (p.safe) s.log.unshift({ k: 'block', m: `Teller ${k + 1} blocked: full = 0` }); else { s.underflow++; s.log.unshift({ k: 'lost', m: `Teller ${k + 1} read an empty buffer` }); } continue; }
+      const id = s.buf.shift(); s.consumed++; s.log.unshift({ k: 'cons', m: `Teller ${k + 1} processed ${id}` });
+      if (!p.safe && p.consumers > 1 && rnd() < 0.2) { s.dup++; s.log.unshift({ k: 'lost', m: `${id} processed twice (race)` }); }
+    }
+    s.log.length = Math.min(s.log.length, 60); s.peak = Math.max(s.peak || 0, s.buf.length);
+    return s;
+  }
+  const newSync = () => ({ buf: [], produced: 0, consumed: 0, lost: 0, dup: 0, underflow: 0, blocked: 0, n: 0, peak: 0, log: [] });
+
+  /* ---------- Integrated bank simulation ---------- */
+  function simulateBank(txns, cfg) {
+    const byId = {}; txns.forEach((x) => (byId[x.id] = x));
+    const R = cfg.resTotal.length, mem = newMem(cfg.parts), fit = cfg.fit;
+    let avail = [...cfg.resTotal];
+    const alloc = {}, rem = {}, admitT = {}, doneT = {}, note = {};
+    let backlog = [], buffer = [], admitted = [], rrQ = [], done = [], arrived = new Set();
+    let lastRun = null, lastPid = null, curRR = null, slice = 0, t = 0, idleStreak = 0;
+    const stats = { bankerWaits: 0, memWaits: 0, blocked: 0, peak: 0, busy: 0, ctx: 0, preempt: 0 };
+    const gantt = [], snaps = [];
+    const say = (ev, k, id, msg) => { if (id && note[id] === msg) return; if (id) note[id] = msg; ev.push({ k, id, msg }); };
+    const mats = (ids) => ({ al: ids.map((i) => alloc[i] || zeros(R)), mx: ids.map((i) => byId[i].max) });
+
+    while (done.length < txns.length && t < 600) {
+      const ev = [];
+      txns.filter((x) => x.at <= t && !arrived.has(x.id)).sort((a, b) => a.at - b.at || cmpId(a, b)).forEach((x) => { arrived.add(x.id); backlog.push(x.id); ev.push({ k: 'arrive', id: x.id, msg: `${x.id} ${x.type} arrives via ${x.channel}` }); });
+      const fill = () => { while (backlog.length && buffer.length < cfg.bufferCap) { const id = backlog.shift(); buffer.push(id); ev.push({ k: 'enq', id, msg: `${id} enters the buffer` }); } };
+      fill();
+      // admission: memory block + Banker's first request
+      let adm = 0;
+      for (const id of [...buffer]) {
+        if (adm >= cfg.consumers) break;
+        const x = byId[id];
+        if (!memCanFit(mem, x.mem, fit)) { stats.memWaits++; say(ev, 'wait', id, `${id} waits: no free block of ${x.mem} KB`); continue; }
+        const ids = [...admitted, id]; const { al, mx } = mats(ids);
+        const req0 = x.max.map((m) => Math.ceil(m * (cfg.firstShare ?? 0.5)));
+        const r = bankerRequest(ids, al, mx, avail, ids.length - 1, req0);
+        if (!r.ok) { stats.bankerWaits++; say(ev, 'deny', id, `${id} held at the gate: first request (${req0.join(',')}) ${r.code === 'unsafe' ? 'would leave an unsafe state' : 'exceeds Available (' + avail.join(',') + ')'}`); continue; }
+        const a = memAlloc(mem, id, x.mem, fit);
+        alloc[id] = req0; avail = r.avail; rem[id] = x.bt; admitT[id] = t; admitted.push(id); rrQ.push(id);
+        buffer.splice(buffer.indexOf(id), 1); adm++; note[id] = null;
+        ev.push({ k: 'admit', id, msg: `${id} admitted: block ${a.part} (${x.mem} KB), holds ${req0.join(',')}, safe sequence <${r.seq.join(', ')}>` });
+      }
+      fill();
+      if (backlog.length) { stats.blocked++; say(ev, 'block', null, `Buffer full: ${backlog.length} request(s) wait at the channels`); }
+      stats.peak = Math.max(stats.peak, buffer.length);
+
+      // CPU: eligibility needs the second Banker request to be safe
+      const info = {}; const cands = admitted.filter((id) => rem[id] > 0);
+      cands.forEach((id) => {
+        const need = vSub(byId[id].max, alloc[id]);
+        if (need.every((v) => v === 0)) { info[id] = { ok: true, need }; return; }
+        const { al, mx } = mats(admitted); const r = bankerRequest(admitted, al, mx, avail, admitted.indexOf(id), need);
+        info[id] = { ok: r.ok, need, code: r.code };
+      });
+      const elig = cands.filter((id) => info[id].ok);
+      let pick = null;
+      const pol = cfg.policy;
+      if (elig.length) {
+        const by = (f) => [...elig].sort((a, b) => f(a) - f(b) || admitT[a] - admitT[b] || cmpId(byId[a], byId[b]))[0];
+        if (pol === 'prio-p') pick = by((i) => byId[i].priority);
+        else if (pol === 'srtf') pick = by((i) => rem[i]);
+        else if (pol === 'fcfs') pick = lastRun && elig.includes(lastRun) && rem[lastRun] > 0 ? lastRun : by((i) => admitT[i]);
+        else {
+          if (curRR && (!elig.includes(curRR) || slice >= cfg.quantum)) { if (rem[curRR] > 0 && admitted.includes(curRR)) { rrQ.splice(rrQ.indexOf(curRR), 1); rrQ.push(curRR); } curRR = null; }
+          if (!curRR) { curRR = rrQ.find((i) => elig.includes(i)) || null; slice = 0; }
+          pick = curRR;
+        }
+      }
+      cands.filter((id) => !info[id].ok).forEach((id) => say(ev, 'deny', id, `${id} cannot run: its remaining request (${info[id].need.join(',')}) ${info[id].code === 'unsafe' ? 'would leave an unsafe state' : 'exceeds Available'}`));
+      if (pick) {
+        if (info[pick].need.some((v) => v > 0)) {
+          const { al, mx } = mats(admitted); const r = bankerRequest(admitted, al, mx, avail, admitted.indexOf(pick), info[pick].need);
+          alloc[pick] = vAdd(alloc[pick], info[pick].need); avail = r.avail;
+          ev.push({ k: 'grant', id: pick, msg: `${pick} receives its remaining claim (${info[pick].need.join(',')}); state stays safe` });
+        }
+        if (lastPid && lastPid !== pick) stats.ctx++; lastPid = pick;
+        if (lastRun && lastRun !== pick) { if (rem[lastRun] > 0) { stats.preempt++; ev.push({ k: 'pre', id: pick, msg: `${pick} replaces ${lastRun} on the CPU` }); } }
+        rem[pick]--; slice++; stats.busy++; lastRun = pick;
+        const last = gantt[gantt.length - 1]; if (last && last.pid === pick && last.end === t) last.end = t + 1; else gantt.push({ pid: pick, start: t, end: t + 1 });
+      } else { const last = gantt[gantt.length - 1]; if (last && last.pid === 'IDLE' && last.end === t) last.end = t + 1; else gantt.push({ pid: 'IDLE', start: t, end: t + 1 }); }
+      const running = pick;
+      if (pick && rem[pick] === 0) {
+        done.push(pick); doneT[pick] = t + 1; admitted.splice(admitted.indexOf(pick), 1);
+        avail = vAdd(avail, alloc[pick]); alloc[pick] = zeros(R); memFree(mem, pick); const q = rrQ.indexOf(pick); if (q >= 0) rrQ.splice(q, 1);
+        if (curRR === pick) curRR = null; lastRun = null;
+        ev.push({ k: 'done', id: pick, msg: `${pick} completes at t=${t + 1}; memory and resources released` });
+      }
+      snaps.push({
+        t, backlog: [...backlog], buffer: [...buffer], running, done: [...done], avail: [...avail], ev,
+        admitted: admitted.map((id) => ({ id, rem: rem[id], alloc: [...alloc[id]], state: id === running ? 'running' : info[id] && !info[id].ok ? 'blocked' : 'ready' })),
+        mem: cloneMem(mem), memStats: memStats(mem),
+      });
+      idleStreak = pick || adm || arrived.size < txns.length ? 0 : idleStreak + 1;
+      if (idleStreak > 25) break;
+      t++;
+    }
+    const stuck = txns.filter((x) => !done.includes(x.id)).map((x) => x.id);
+    const rows = txns.map((x) => ({ id: x.id, at: x.at, bt: x.bt, admit: admitT[x.id] ?? null, ct: doneT[x.id] ?? null, tat: doneT[x.id] != null ? doneT[x.id] - x.at : null, wt: doneT[x.id] != null ? doneT[x.id] - x.at - x.bt : null, gate: admitT[x.id] != null ? admitT[x.id] - x.at : null }));
+    const fin = rows.filter((r) => r.ct != null), nn = fin.length || 1;
+    const total = snaps.length;
+    return { snaps, gantt, rows, stuck, stats: { ...stats, total, util: total ? (stats.busy / total) * 100 : 0, avgWT: sum(fin.map((r) => r.wt)) / nn, avgTAT: sum(fin.map((r) => r.tat)) / nn, avgGate: sum(fin.map((r) => r.gate)) / nn, throughput: total ? fin.length / total : 0 } };
+  }
+
+  return { ALGOS, simulateCPU, metricsFromBlocks, safety, bankerRequest, newMem, cloneMem, memAlloc, memFree, memStats, memBatch, memCanFit, syncTick, newSync, simulateBank, cmpId };
+})();
+
+
+</script>
+<script>
+/* ===== BankOS UI (htm + React, no build step) ===== */
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+const html = htm.bind(React.createElement);
+
+const TYPES = [
+  { name: 'Fraud Check', key: 'fraud', pri: 1 },
+  { name: 'Withdrawal', key: 'withdrawal', pri: 2 },
+  { name: 'Transfer', key: 'transfer', pri: 3 },
+  { name: 'Inquiry', key: 'inquiry', pri: 4 },
+  { name: 'Deposit', key: 'deposit', pri: 5 },
+];
+const CHANNELS = ['ATM', 'Mobile', 'Online', 'Branch'];
+const RES = ['DB connections', 'Core threads', 'Printer units'];
+const RES_SHORT = ['DB', 'Thr', 'Prn'];
+const tk = (type) => (TYPES.find((t) => t.name === type) || { key: 'deposit' }).key;
+let TYPEMAP = {};
+const mk = (id, type, channel, at, bt, priority, mem, max) => ({ id, type, channel, at, bt, priority, mem, max });
+const SCENARIOS = {
+  report: { name: 'Report example', note: 'The five transactions used in the written report.', txns: [
+    mk('T1', 'Deposit', 'ATM', 0, 5, 5, 212, [7, 5, 3]), mk('T2', 'Fraud Check', 'Online', 2, 2, 1, 417, [3, 2, 2]),
+    mk('T3', 'Withdrawal', 'ATM', 3, 4, 2, 112, [9, 0, 2]), mk('T4', 'Transfer', 'Mobile', 4, 3, 3, 426, [2, 2, 2]),
+    mk('T5', 'Inquiry', 'Branch', 5, 1, 4, 90, [4, 3, 3])] },
+  rush: { name: 'Salary-day rush', note: 'Ten requests arrive within five milliseconds.', txns: [
+    mk('T1', 'Deposit', 'Branch', 0, 3, 5, 120, [2, 1, 1]), mk('T2', 'Withdrawal', 'ATM', 0, 4, 2, 90, [3, 1, 1]),
+    mk('T3', 'Withdrawal', 'ATM', 1, 4, 2, 90, [3, 1, 1]), mk('T4', 'Transfer', 'Mobile', 1, 3, 3, 150, [2, 1, 2]),
+    mk('T5', 'Inquiry', 'Mobile', 1, 1, 4, 60, [1, 1, 1]), mk('T6', 'Transfer', 'Online', 2, 4, 3, 180, [3, 1, 2]),
+    mk('T7', 'Fraud Check', 'Online', 2, 2, 1, 200, [2, 2, 1]), mk('T8', 'Deposit', 'ATM', 3, 3, 5, 110, [2, 1, 2]),
+    mk('T9', 'Inquiry', 'ATM', 3, 1, 4, 60, [1, 1, 1]), mk('T10', 'Withdrawal', 'Branch', 4, 5, 2, 250, [4, 1, 2])] },
+  fraud: { name: 'Fraud spike', note: 'Three fraud checks land while a long transfer runs.', txns: [
+    mk('T1', 'Transfer', 'Online', 0, 6, 3, 300, [3, 2, 2]), mk('T2', 'Fraud Check', 'Online', 1, 2, 1, 150, [2, 1, 1]),
+    mk('T3', 'Fraud Check', 'Mobile', 2, 2, 1, 150, [2, 1, 1]), mk('T4', 'Withdrawal', 'ATM', 2, 4, 2, 200, [3, 1, 2]),
+    mk('T5', 'Fraud Check', 'ATM', 3, 3, 1, 180, [2, 1, 1]), mk('T6', 'Deposit', 'Branch', 3, 2, 5, 100, [1, 1, 1]),
+    mk('T7', 'Inquiry', 'Mobile', 4, 1, 4, 50, [1, 1, 1]), mk('T8', 'Transfer', 'Online', 5, 5, 3, 280, [3, 2, 2])] },
+};
+const DEFAULT_CFG = { resTotal: [10, 5, 7], parts: [100, 500, 200, 300, 600], fit: 'first', bufferCap: 4, consumers: 2, policy: 'prio-p', quantum: 2, firstShare: 0.5 };
+const POLICIES = [{ id: 'prio-p', name: 'Priority (P)' }, { id: 'srtf', name: 'SRTF' }, { id: 'fcfs', name: 'FCFS' }, { id: 'rr', name: 'Round Robin' }];
+const NAV = [
+  { g: 'Platform', items: [['overview', 'Command center'], ['live', 'Live bank'], ['workload', 'Workload']] },
+  { g: 'Modules', items: [['cpu', 'CPU scheduler'], ['sync', 'Sync lab'], ['deadlock', 'Deadlock guard'], ['memory', 'Memory manager']] },
+  { g: 'Evidence', items: [['report', 'Report and tests']] },
+];
+const PAGES = NAV.flatMap((g) => g.items.map((i) => i[0]));
+const fmt = (n, d = 2) => (Number.isFinite(n) ? String(Math.round(n * 10 ** d) / 10 ** d) : '-');
+const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
+const ival = (v, min = 0) => Math.max(min, Math.floor(Number(v) || 0));
+
+/* ---------- small pieces ---------- */
+function Chip({ id, type, big, state }) {
+  const ty = type || TYPEMAP[id];
+  return html`<span className=${'chip' + (big ? ' big' : '') + (state ? ' ' + state : '')} style=${{ '--c': ty ? `var(--t-${tk(ty)})` : 'var(--muted)' }} title=${ty ? `${id} · ${ty}` : id}>${id}</span>`;
+}
+const Pill = ({ tone = 'info', children }) => html`<span className=${'pill ' + tone}>${children}</span>`;
+const Kpi = ({ label, value, unit, note, tone }) => html`<div className="kpi"><div className="lbl">${label}</div><div className=${'val ' + (tone || '')}>${value}${unit ? html`<small>${unit}</small>` : null}</div>${note ? html`<div className="note">${note}</div>` : null}</div>`;
+const Head = ({ eyebrow, title, sub, right }) => html`<header className="phead"><div><div className="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? html`<p>${sub}</p>` : null}</div>${right ? html`<div className="phead-r">${right}</div>` : null}</header>`;
+const Seg = ({ value, options, onChange, label }) => html`<div className="seg" role="group" aria-label=${label}>${options.map((o) => html`<button key=${o.id} className=${value === o.id ? 'on' : ''} onClick=${() => onChange(o.id)}>${o.name}</button>`)}</div>`;
+function Num({ label, value, onChange, min = 0, w = 70, id }) {
+  return html`<label className="fld"><span>${label}</span><input id=${id} type="number" min=${min} value=${value} style=${{ width: w }} onChange=${(e) => onChange(ival(e.target.value, min))} /></label>`;
+}
+
+function usePlayer(total, ms = 750) {
+  const [i, setI] = useState(0), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState(1);
+  useEffect(() => {
+    if (!playing) return undefined;
+    const id = setInterval(() => setI((v) => { if (v >= total - 1) { setPlaying(false); return v; } return v + 1; }), ms / speed);
+    return () => clearInterval(id);
+  }, [playing, speed, total, ms]);
+  useEffect(() => { setI((v) => Math.min(v, Math.max(0, total - 1))); }, [total]);
+  return { i, setI, playing, setPlaying, speed, setSpeed, total };
+}
+function PlayerBar({ p, label }) {
+  const toggle = () => { if (!p.playing && p.i >= p.total - 1) p.setI(0); p.setPlaying(!p.playing); };
+  return html`<div className="player">
+    <div className="pbtns">
+      <button className="ib" title="Restart" onClick=${() => { p.setI(0); p.setPlaying(false); }}>⟲</button>
+      <button className="ib" title="Step back" onClick=${() => { p.setPlaying(false); p.setI(Math.max(0, p.i - 1)); }}>◀</button>
+      <button className="ib main" title=${p.playing ? 'Pause' : 'Play'} onClick=${toggle}>${p.playing ? '❚❚' : '▶'}</button>
+      <button className="ib" title="Step forward" onClick=${() => { p.setPlaying(false); p.setI(Math.min(p.total - 1, p.i + 1)); }}>▶|</button>
+    </div>
+    <input className="scrub" type="range" min="0" max=${Math.max(0, p.total - 1)} value=${p.i} aria-label="Simulation time" onChange=${(e) => { p.setPlaying(false); p.setI(Number(e.target.value)); }} />
+    <div className="clock mono">${label}</div>
+    <div className="speeds">${[0.5, 1, 2, 4].map((s) => html`<button key=${s} className=${p.speed === s ? 'on' : ''} onClick=${() => p.setSpeed(s)}>${s}x</button>`)}</div>
+  </div>`;
+}
+function Gantt({ blocks, cursor, height = 44 }) {
+  const total = blocks.length ? Math.max(...blocks.map((b) => b.end)) : 1;
+  const step = Math.max(1, Math.ceil(total / 14));
+  const ticks = []; for (let t = 0; t <= total; t += step) ticks.push(t);
+  return html`<div className="gantt-wrap"><div className="gantt" style=${{ height }}>
+    ${blocks.map((b, k) => { const idle = b.pid === 'IDLE'; const cur = cursor != null && b.start <= cursor && cursor < b.end; const fut = cursor != null && b.start > cursor;
+      return html`<div key=${k} className=${'gb' + (idle ? ' idle' : '') + (cur ? ' cur' : '') + (fut ? ' fut' : '')} style=${{ flexGrow: b.end - b.start, '--c': idle ? 'transparent' : `var(--t-${tk(TYPEMAP[b.pid])})` }} title=${`${idle ? 'Idle' : b.pid}: ${b.start} to ${b.end} ms`}>${!idle && b.end - b.start >= total / 22 ? b.pid : ''}</div>`; })}
+    ${cursor != null ? html`<div className="gcursor" style=${{ left: `${Math.min(100, (cursor / total) * 100)}%` }}></div>` : null}
+  </div><div className="gticks mono">${ticks.map((t) => html`<span key=${t} style=${{ left: `${(t / total) * 100}%` }}>${t}</span>`)}</div></div>`;
+}
+function MemMap({ mem }) {
+  return html`<div className="memmap">${mem.map((p) => {
+    const segs = [...p.used.map((u) => ({ ...u, k: 'u' })), ...p.holes.map((h) => ({ ...h, k: 'h' }))].sort((a, b) => a.off - b.off);
+    return html`<div className="mrow" key=${p.id}><div className="mlbl mono">P${p.id}<small>${p.size} KB</small></div><div className="mbar">${segs.map((s, k) => html`<div key=${k} className=${'mseg ' + s.k} style=${{ flexGrow: s.size, '--c': s.k === 'u' ? `var(--t-${tk(TYPEMAP[s.id])})` : 'transparent' }} title=${s.k === 'u' ? `${s.id}: ${s.size} KB` : `Free: ${s.size} KB`}>${s.size / p.size > 0.16 ? (s.k === 'u' ? s.id : s.size) : ''}</div>`)}</div></div>`;
+  })}</div>`;
+}
+function Empty({ go }) {
+  return html`<div className="empty"><h3>No transactions yet</h3><p>Add transactions on the Workload page or load a scenario. Every module reads the same workload.</p><button className="btn pri" onClick=${() => go('workload')}>Open workload</button></div>`;
+}
+
+/* ---------- Overview ---------- */
+function Overview({ txns, cpuAll, bank, cfg, go, scenarioName }) {
+  if (!txns.length) return html`<${Empty} go=${go} />`;
+  const best = [...cpuAll].sort((a, b) => a.m.avgWT - b.m.avgWT)[0];
+  const maxWT = Math.max(...cpuAll.map((c) => c.m.avgWT), 1);
+  const st = bank.stats;
+  const insights = [];
+  const byPri = [...bank.rows].filter((r) => r.gate != null).sort((a, b) => (txns.find((x) => x.id === a.id).priority) - (txns.find((x) => x.id === b.id).priority));
+  const top = byPri[0];
+  if (top && top.gate > 0) insights.push({ tone: 'warn', t: `${top.id} (${txns.find((x) => x.id === top.id).type}) has the best priority but waited ${top.gate} ms at the resource gate. The CPU scheduler was ready; Banker's Algorithm held it because earlier transactions hold the shared resources.` });
+  if (st.bankerWaits) insights.push({ tone: 'info', t: `Banker's Algorithm held requests back on ${st.bankerWaits} ticks to keep the system in a safe state. No deadlock occurred.` });
+  if (st.blocked) insights.push({ tone: 'warn', t: `Producers were blocked for ${st.blocked} ms because the ${cfg.bufferCap}-slot buffer was full. Raise the buffer size or add tellers.` });
+  if (st.memWaits) insights.push({ tone: 'warn', t: `${st.memWaits} admission attempts failed for lack of a large enough memory block (${cfg.fit === 'first' ? 'First' : 'Best'} Fit).` });
+  insights.push({ tone: 'ok', t: `${best.a.full} gives the lowest average waiting time on this workload (${fmt(best.m.avgWT)} ms) when only the CPU is considered.` });
+  if (bank.stuck.length) insights.unshift({ tone: 'bad', t: `${bank.stuck.join(', ')} could not finish. Check that each claim fits within the resource totals and each session fits a partition.` });
+  const stages = [
+    ['Channels', `${txns.length} requests`, 'ATM, mobile, online, branch', 'live'], ['Buffer', `peak ${st.peak} of ${cfg.bufferCap}`, `${st.blocked} ms producers blocked`, 'sync'],
+    ['Safe gate', `${st.bankerWaits} holds`, "Banker's Algorithm", 'deadlock'], ['Memory', `${cfg.fit === 'first' ? 'First' : 'Best'} Fit`, `${st.memWaits} failed fits`, 'memory'],
+    ['CPU', `${fmt(st.util, 0)}% busy`, POLICIES.find((p) => p.id === cfg.policy).name, 'cpu'],
+  ];
+  return html`<div className="page">
+    <${Head} eyebrow=${'Workload: ' + scenarioName} title="Command center" sub="One workload flows through the buffer, the safe-state gate, memory allocation and the CPU. Every number here is computed from it." right=${html`<button className="btn pri" onClick=${() => go('live')}>Watch it run</button>`} />
+    <div className="kpis">
+      <${Kpi} label="Transactions" value=${txns.length} note=${`${bank.rows.filter((r) => r.ct != null).length} completed`} />
+      <${Kpi} label="Avg turnaround" value=${fmt(st.avgTAT)} unit=" ms" note="whole pipeline" />
+      <${Kpi} label="Avg waiting" value=${fmt(st.avgWT)} unit=" ms" note=${`${fmt(st.avgGate)} ms of it at the gate`} />
+      <${Kpi} label="CPU busy" value=${fmt(st.util, 0)} unit="%" note=${`${st.ctx} context switches`} />
+      <${Kpi} label="System state" value=${bank.stuck.length ? 'Stuck' : 'Safe'} tone=${bank.stuck.length ? 'bad' : 'ok'} note=${bank.stuck.length ? bank.stuck.join(', ') + ' unfinished' : 'no deadlock reached'} />
+    </div>
+    <section className="card"><h2>Pipeline</h2><div className="flow">${stages.map((s, k) => html`<button key=${s[0]} className="stg" onClick=${() => go(s[3])}><span className="n mono">${s[0]}</span><b>${s[1]}</b><small>${s[2]}</small>${k < stages.length - 1 ? html`<i aria-hidden="true">→</i>` : null}</button>`)}</div></section>
+    <div className="two">
+      <section className="card"><h2>What the run shows</h2><ul className="ins">${insights.map((x, k) => html`<li key=${k}><${Pill} tone=${x.tone}>${{ ok: 'OK', warn: 'Watch', bad: 'Problem', info: 'Note' }[x.tone]}<//><span>${x.t}</span></li>`)}</ul></section>
+      <section className="card"><h2>Scheduler comparison <small>average waiting time, ms</small></h2>
+        <div className="bars">${[...cpuAll].sort((a, b) => a.m.avgWT - b.m.avgWT).map((c) => html`<div className="brow" key=${c.a.id}><span>${c.a.name}${c.a.id === best.a.id ? html`<${Pill} tone="ok">best<//>` : null}</span><div className="btrack"><div className="bfill" style=${{ width: `${(c.m.avgWT / maxWT) * 100}%` }}></div></div><b className="mono">${fmt(c.m.avgWT)}</b></div>`)}</div>
+        <button className="link" onClick=${() => go('cpu')}>Open CPU scheduler →</button></section>
+    </div>
+  </div>`;
+}
+
+/* ---------- Live bank ---------- */
+function Live({ txns, bank, cfg, setCfg, go }) {
+  const snaps = bank.snaps; const p = usePlayer(snaps.length);
+  const [open, setOpen] = useState(false);
+  if (!txns.length || !snaps.length) return html`<${Empty} go=${go} />`;
+  const s = snaps[Math.min(p.i, snaps.length - 1)];
+  const arrivedN = txns.filter((x) => x.at <= s.t).length;
+  const log = snaps.slice(0, p.i + 1).flatMap((x) => x.ev.map((e) => ({ ...e, t: x.t }))).reverse().slice(0, 40);
+  const run = s.admitted.find((a) => a.id === s.running);
+  const last = p.i >= snaps.length - 1;
+  return html`<div className="page">
+    <${Head} eyebrow="Integrated simulation" title="Live bank" sub="Requests move left to right. Each stage enforces one operating-system rule." right=${html`<button className="btn" onClick=${() => setOpen(!open)}>${open ? 'Hide' : 'Show'} configuration</button>`} />
+    ${open ? html`<section className="card cfg">
+      <label className="fld"><span>CPU policy</span><${Seg} label="CPU policy" value=${cfg.policy} options=${POLICIES} onChange=${(v) => setCfg({ ...cfg, policy: v })} /></label>
+      <label className="fld"><span>Memory fit</span><${Seg} label="Memory fit" value=${cfg.fit} options=${[{ id: 'first', name: 'First Fit' }, { id: 'best', name: 'Best Fit' }]} onChange=${(v) => setCfg({ ...cfg, fit: v })} /></label>
+      <${Num} id="cfg-buf" label="Buffer slots" min=${1} value=${cfg.bufferCap} onChange=${(v) => setCfg({ ...cfg, bufferCap: Math.min(12, v) })} />
+      <${Num} id="cfg-con" label="Tellers" min=${1} value=${cfg.consumers} onChange=${(v) => setCfg({ ...cfg, consumers: Math.min(6, v) })} />
+      <${Num} id="cfg-q" label="RR quantum" min=${1} value=${cfg.quantum} onChange=${(v) => setCfg({ ...cfg, quantum: v })} />
+      ${RES.map((r, k) => html`<${Num} key=${r} id=${'cfg-r' + k} label=${r} min=${1} value=${cfg.resTotal[k]} onChange=${(v) => setCfg({ ...cfg, resTotal: cfg.resTotal.map((x, j) => (j === k ? v : x)) })} />`)}
+    </section>` : null}
+    <section className="card"><${PlayerBar} p=${p} label=${`t = ${s.t} ms`} />
+      <div className="stages">
+        <div className="stage"><h3>Channels<small>producers</small></h3><div className="chips">${s.backlog.map((id) => html`<${Chip} key=${id} id=${id} />`)}${!s.backlog.length ? html`<em>none waiting</em>` : null}</div><small className="foot">${txns.length - arrivedN} yet to arrive</small></div>
+        <div className="stage"><h3>Buffer<small>${s.buffer.length}/${cfg.bufferCap} used</small></h3><div className="slots">${Array.from({ length: cfg.bufferCap }).map((_, k) => html`<div key=${k} className=${'slot' + (s.buffer[k] ? ' full' : '')}>${s.buffer[k] ? html`<${Chip} id=${s.buffer[k]} />` : null}</div>`)}</div><small className="foot mono">full=${s.buffer.length} empty=${cfg.bufferCap - s.buffer.length}</small></div>
+        <div className="stage"><h3>Safe gate<small>available</small></h3><div className="gauges">${RES.map((r, k) => html`<div className="gauge" key=${r}><span>${RES_SHORT[k]}</span><div className="gtrack"><div className="gfill" style=${{ width: `${(s.avail[k] / cfg.resTotal[k]) * 100}%` }}></div></div><b className="mono">${s.avail[k]}/${cfg.resTotal[k]}</b></div>`)}</div><small className="foot">${s.ev.some((e) => e.k === 'deny') ? 'Holding a request' : 'Gate open'}</small></div>
+        <div className="stage cpu"><h3>CPU<small>${POLICIES.find((x) => x.id === cfg.policy).name}</small></h3><div className="cpubox">${s.running ? html`<${Chip} key=${s.running + s.t} id=${s.running} big=${true} />` : html`<span className="idle">idle</span>`}</div><div className="chips">${s.admitted.filter((a) => a.id !== s.running).map((a) => html`<${Chip} key=${a.id} id=${a.id} state=${a.state} />`)}</div><small className="foot">${run ? `${run.rem} ms left` : 'ready and blocked below'}</small></div>
+        <div className="stage"><h3>Completed<small>${s.done.length}/${txns.length}</small></h3><div className="chips">${s.done.map((id) => html`<${Chip} key=${id} id=${id} />`)}${!s.done.length ? html`<em>none yet</em>` : null}</div></div>
+      </div>
+      <div className="legend">${TYPES.map((t) => html`<span key=${t.key}><i style=${{ background: `var(--t-${t.key})` }}></i>${t.name}</span>`)}<span><i className="blk"></i>blocked</span></div>
+    </section>
+    <div className="two">
+      <section className="card"><h2>Timeline</h2><${Gantt} blocks=${bank.gantt} cursor=${s.t} height=${46} />
+        <h2 className="mt">Memory map <small>${cfg.fit === 'first' ? 'First Fit' : 'Best Fit'} · ${fmt(s.memStats.external, 0)}% external fragmentation</small></h2><${MemMap} mem=${s.mem} /></section>
+      <section className="card"><h2>Event log</h2><ol className="log">${log.map((e, k) => html`<li key=${k} className=${e.k}><span className="mono">${e.t}</span><i></i><span>${e.msg}</span></li>`)}</ol></section>
+    </div>
+    ${last ? html`<section className="card"><h2>Results <small>whole pipeline, ms</small></h2><div className="tw"><table><thead><tr><th>Txn</th><th>Arrive</th><th>Burst</th><th>Admitted</th><th>Gate wait</th><th>Done</th><th>TAT</th><th>WT</th></tr></thead><tbody>
+      ${bank.rows.map((r) => html`<tr key=${r.id}><td><${Chip} id=${r.id} /></td><td>${r.at}</td><td>${r.bt}</td><td>${r.admit ?? '-'}</td><td>${r.gate ?? '-'}</td><td>${r.ct ?? '-'}</td><td>${r.tat ?? '-'}</td><td>${r.wt ?? '-'}</td></tr>`)}
+      <tr className="avg"><td>Average</td><td></td><td></td><td></td><td>${fmt(bank.stats.avgGate)}</td><td></td><td>${fmt(bank.stats.avgTAT)}</td><td>${fmt(bank.stats.avgWT)}</td></tr></tbody></table></div></section>` : null}
+  </div>`;
+}
+
+/* ---------- Workload ---------- */
+function Workload({ txns, setTxns, cfg, scenario, setScenario }) {
+  const maxPart = Math.max(...cfg.parts, 0);
+  const upd = (i, k, v) => setTxns(txns.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const updMax = (i, r, v) => setTxns(txns.map((x, j) => (j === i ? { ...x, max: x.max.map((m, q) => (q === r ? v : m)) } : x)));
+  const add = () => { let n = txns.length + 1; while (txns.some((x) => x.id === 'T' + n)) n++; const at = txns.length ? Math.max(...txns.map((x) => x.at)) : 0; setTxns([...txns, mk('T' + n, 'Deposit', 'ATM', at, 3, 5, 100, [1, 1, 1])]); };
+  const problems = txns.flatMap((x) => [
+    x.bt < 1 ? `${x.id}: burst time must be at least 1 ms.` : null,
+    x.mem > maxPart ? `${x.id}: needs ${x.mem} KB but the largest partition is ${maxPart} KB, so it can never be admitted.` : null,
+    ...x.max.map((m, r) => (m > cfg.resTotal[r] ? `${x.id}: claims ${m} ${RES[r].toLowerCase()} but the system has ${cfg.resTotal[r]}.` : null)),
+  ]).filter(Boolean);
+  return html`<div className="page">
+    <${Head} eyebrow="Single source of truth" title="Workload" sub="Edit the transactions here. The scheduler, sync lab, deadlock guard and memory manager all update from this table." right=${html`<div className="row"><${Seg} label="Scenario" value=${scenario} options=${Object.entries(SCENARIOS).map(([id, s]) => ({ id, name: s.name }))} onChange=${(id) => { setScenario(id); setTxns(SCENARIOS[id].txns.map((x) => ({ ...x, max: [...x.max] }))); }} /></div>`} />
+    <section className="card"><div className="tw"><table className="edit"><thead><tr><th>Txn</th><th>Type</th><th>Channel</th><th>Arrival ms</th><th>Burst ms</th><th>Priority</th><th>Memory KB</th>${RES.map((r) => html`<th key=${r}>Claim ${r.split(' ')[0]}</th>`)}<th></th></tr></thead><tbody>
+      ${txns.map((x, i) => html`<tr key=${x.id}><td><${Chip} id=${x.id} type=${x.type} /></td>
+        <td><select aria-label=${x.id + ' type'} value=${x.type} onChange=${(e) => { const t = TYPES.find((q) => q.name === e.target.value); setTxns(txns.map((y, j) => (j === i ? { ...y, type: t.name, priority: t.pri } : y))); }}>${TYPES.map((t) => html`<option key=${t.key}>${t.name}</option>`)}</select></td>
+        <td><select aria-label=${x.id + ' channel'} value=${x.channel} onChange=${(e) => upd(i, 'channel', e.target.value)}>${CHANNELS.map((c) => html`<option key=${c}>${c}</option>`)}</select></td>
+        <td><input type="number" min="0" aria-label=${x.id + ' arrival'} value=${x.at} onChange=${(e) => upd(i, 'at', ival(e.target.value))} /></td>
+        <td><input type="number" min="1" aria-label=${x.id + ' burst'} value=${x.bt} onChange=${(e) => upd(i, 'bt', ival(e.target.value, 1))} /></td>
+        <td><input type="number" min="1" aria-label=${x.id + ' priority'} value=${x.priority} onChange=${(e) => upd(i, 'priority', ival(e.target.value, 1))} /></td>
+        <td><input type="number" min="1" style=${{ width: 78 }} aria-label=${x.id + ' memory'} value=${x.mem} onChange=${(e) => upd(i, 'mem', ival(e.target.value, 1))} /></td>
+        ${x.max.map((m, r) => html`<td key=${r}><input type="number" min="0" aria-label=${`${x.id} claim ${RES[r]}`} value=${m} onChange=${(e) => updMax(i, r, ival(e.target.value))} /></td>`)}
+        <td><button className="ib" title=${'Remove ' + x.id} onClick=${() => setTxns(txns.filter((_, j) => j !== i))}>✕</button></td></tr>`)}
+    </tbody></table></div>
+    <div className="row mt"><button className="btn pri" onClick=${add}>Add transaction</button><button className="btn" onClick=${() => { setScenario('report'); setTxns(SCENARIOS.report.txns.map((x) => ({ ...x, max: [...x.max] }))); }}>Reset to report example</button><small className="muted">Priority 1 is the highest. Changing the type sets its default priority.</small></div></section>
+    <section className="card"><h2>Checks</h2>${problems.length ? html`<ul className="ins">${problems.map((m, k) => html`<li key=${k}><${Pill} tone="bad">Fix<//><span>${m}</span></li>`)}</ul>` : html`<p className="ok-line"><${Pill} tone="ok">Valid<//> Every claim fits the resource totals and every session fits a partition.</p>`}
+      <small className="muted">Resource totals and partitions are set under Live bank (configuration) and Memory manager.</small></section>
+  </div>`;
+}
+
+/* ---------- CPU scheduler ---------- */
+function CPU({ txns, cpuAll, cfg, setCfg, algo, setAlgo, go }) {
+  const sel = cpuAll.find((c) => c.a.id === algo) || cpuAll[0];
+  const total = sel.m.total;
+  const p = usePlayer(total + 1, 650);
+  if (!txns.length) return html`<${Empty} go=${go} />`;
+  const t = p.i;
+  const exec = (id) => sel.r.blocks.filter((b) => b.pid === id).reduce((s, b) => s + Math.max(0, Math.min(b.end, t) - b.start), 0);
+  const cur = sel.r.blocks.find((b) => b.start <= t && t < b.end);
+  const running = cur && cur.pid !== 'IDLE' ? cur.pid : null;
+  const doneIds = txns.filter((x) => exec(x.id) >= x.bt).map((x) => x.id);
+  const ready = txns.filter((x) => x.at <= t && !doneIds.includes(x.id) && x.id !== running);
+  const cands = txns.filter((x) => x.at <= t && !doneIds.includes(x.id));
+  const keyOf = { fcfs: (x) => ['arrival', x.at], sjf: (x) => ['burst', x.bt], srtf: (x) => ['left', x.bt - exec(x.id)], 'prio-np': (x) => ['priority', x.priority], 'prio-p': (x) => ['priority', x.priority], rr: (x) => ['left', x.bt - exec(x.id)] }[sel.a.id];
+  const why = running ? (sel.a.id === 'rr' ? `Round Robin rotates with a ${cfg.quantum} ms quantum. ${running} is at the front of the queue.` : `${running} is chosen by ${keyOf(txns[0])[0]}: ${cands.map((x) => `${x.id}=${keyOf(x)[1]}`).join(', ')}.`) : 'No transaction has arrived yet, so the CPU is idle.';
+  const bestId = [...cpuAll].sort((a, b) => a.m.avgWT - b.m.avgWT)[0].a.id;
+  return html`<div className="page">
+    <${Head} eyebrow="Module 1" title="CPU scheduler" sub=${sel.a.how} right=${html`<${Pill} tone=${sel.a.pre ? 'warn' : 'info'}>${sel.a.pre ? 'Preemptive' : 'Non-preemptive'}<//>`} />
+    <section className="card"><div className="row wrap"><${Seg} label="Algorithm" value=${algo} options=${cpuAll.map((c) => ({ id: c.a.id, name: c.a.name }))} onChange=${(v) => { setAlgo(v); p.setI(0); p.setPlaying(false); }} />${algo === 'rr' ? html`<${Num} id="rr-q" label="Quantum ms" min=${1} value=${cfg.quantum} onChange=${(v) => setCfg({ ...cfg, quantum: v })} />` : null}</div>
+      <div className="mt"><${PlayerBar} p=${p} label=${`t = ${t} ms`} /></div>
+      <div className="cpurow"><div className="cq"><h3>Ready queue</h3><div className="chips">${ready.map((x) => html`<${Chip} key=${x.id} id=${x.id} />`)}${!ready.length ? html`<em>empty</em>` : null}</div></div>
+        <div className="cpu1"><h3>CPU</h3>${running ? html`<${Chip} key=${running + t} id=${running} big=${true} />` : html`<span className="idle">idle</span>`}</div>
+        <div className="cq"><h3>Completed</h3><div className="chips">${doneIds.map((id) => html`<${Chip} key=${id} id=${id} />`)}${!doneIds.length ? html`<em>none yet</em>` : null}</div></div></div>
+      <${Gantt} blocks=${sel.r.blocks} cursor=${t} height=${50} />
+      <div className="why mono"><b>Why this one?</b> ${why}</div></section>
+    <div className="kpis">
+      <${Kpi} label="Avg waiting" value=${fmt(sel.m.avgWT)} unit=" ms" /><${Kpi} label="Avg turnaround" value=${fmt(sel.m.avgTAT)} unit=" ms" /><${Kpi} label="Avg response" value=${fmt(sel.m.avgRT)} unit=" ms" /><${Kpi} label="CPU busy" value=${fmt(sel.m.util, 0)} unit="%" /><${Kpi} label="Context switches" value=${sel.m.ctx} /></div>
+    <div className="two">
+      <section className="card"><h2>${sel.a.full} results</h2><div className="tw"><table><thead><tr><th>Txn</th><th>AT</th><th>BT</th><th>CT</th><th>TAT</th><th>WT</th><th>RT</th></tr></thead><tbody>${sel.m.rows.map((r) => html`<tr key=${r.id}><td><${Chip} id=${r.id} /></td><td>${r.at}</td><td>${r.bt}</td><td>${r.ct}</td><td>${r.tat}</td><td>${r.wt}</td><td>${r.rt}</td></tr>`)}</tbody></table></div></section>
+      <section className="card"><h2>All algorithms, same workload</h2><div className="tw"><table><thead><tr><th>Algorithm</th><th>Avg WT</th><th>Avg TAT</th><th>Avg RT</th><th>Ctx</th></tr></thead><tbody>${cpuAll.map((c) => html`<tr key=${c.a.id} className=${c.a.id === algo ? 'sel' : ''} onClick=${() => { setAlgo(c.a.id); p.setI(0); }}><td>${c.a.name}${c.a.id === bestId ? html`<${Pill} tone="ok">lowest WT<//>` : null}</td><td>${fmt(c.m.avgWT)}</td><td>${fmt(c.m.avgTAT)}</td><td>${fmt(c.m.avgRT)}</td><td>${c.m.ctx}</td></tr>`)}</tbody></table></div><small className="muted">Click a row to simulate it. Lowest waiting time is not always best for urgent work: compare response times and see Live bank.</small></section>
+    </div></div>`;
+}
+
+/* ---------- Sync lab ---------- */
+function Sync({}) {
+  const [par, setPar] = useState({ cap: 5, consumers: 2, pProd: 0.55, pCons: 0.45, safe: true, channels: 4 });
+  const [, bump] = useState(0);
+  const st = useRef(Engine.newSync()); const [run, setRun] = useState(false); const [speed, setSpeed] = useState(1);
+  const parRef = useRef(par); parRef.current = par;
+  useEffect(() => {
+    if (!run) return undefined;
+    const id = setInterval(() => { Engine.syncTick(st.current, { ...parRef.current, chNames: CHANNELS }, Math.random); bump((n) => n + 1); }, 700 / speed);
+    return () => clearInterval(id);
+  }, [run, speed]);
+  const s = st.current;
+  const reset = () => { st.current = Engine.newSync(); setRun(false); bump((n) => n + 1); };
+  return html`<div className="page">
+    <${Head} eyebrow="Module 2" title="Sync lab" sub="Four channels produce requests into a bounded buffer that tellers consume. Switch protection off to see the race conditions the semaphores prevent." right=${html`<${Pill} tone=${par.safe ? 'ok' : 'bad'}>${par.safe ? 'mutex + semaphores on' : 'unprotected'}<//>`} />
+    <section className="card"><div className="row wrap"><${Seg} label="Protection" value=${par.safe ? 'on' : 'off'} options=${[{ id: 'on', name: 'Protected' }, { id: 'off', name: 'Unprotected' }]} onChange=${(v) => { setPar({ ...par, safe: v === 'on' }); reset(); }} />
+      <${Num} id="sy-cap" label="Buffer slots" min=${2} value=${par.cap} onChange=${(v) => setPar({ ...par, cap: Math.min(12, v) })} /><${Num} id="sy-con" label="Tellers" min=${1} value=${par.consumers} onChange=${(v) => setPar({ ...par, consumers: Math.min(6, v) })} />
+      <label className="fld"><span>Arrival rate</span><input id="sy-pp" type="range" min="10" max="100" value=${par.pProd * 100} onChange=${(e) => setPar({ ...par, pProd: e.target.value / 100 })} /></label>
+      <label className="fld"><span>Teller speed</span><input id="sy-pc" type="range" min="10" max="100" value=${par.pCons * 100} onChange=${(e) => setPar({ ...par, pCons: e.target.value / 100 })} /></label>
+      <div className="grow"></div><div className="speeds">${[0.5, 1, 2, 4].map((x) => html`<button key=${x} className=${speed === x ? 'on' : ''} onClick=${() => setSpeed(x)}>${x}x</button>`)}</div>
+      <button className="btn pri" onClick=${() => setRun(!run)}>${run ? 'Pause' : 'Start'}</button><button className="btn" onClick=${reset}>Reset</button></div></section>
+    <div className="kpis"><${Kpi} label="Produced" value=${s.produced} /><${Kpi} label="Processed" value=${s.consumed} /><${Kpi} label="Producer blocked" value=${s.blocked} note="safe waiting" /><${Kpi} label="Lost transactions" value=${s.lost + s.underflow} tone=${s.lost + s.underflow ? 'bad' : ''} note="overflow + empty reads" /><${Kpi} label="Processed twice" value=${s.dup} tone=${s.dup ? 'bad' : ''} note="race condition" /></div>
+    <div className="two"><section className="card"><h2>Shared buffer <small className="mono">full=${s.buf.length} empty=${Math.max(0, par.cap - s.buf.length)}</small></h2><div className="slots wide">${Array.from({ length: par.cap }).map((_, k) => html`<div key=${k} className=${'slot' + (s.buf[k] ? ' full' : '')}>${s.buf[k] ? html`<${Chip} id=${s.buf[k]} />` : null}</div>`)}</div>
+      <pre className="code">${par.safe ? 'Producer: wait(empty); wait(mutex); enqueue(txn); signal(mutex); signal(full)\nConsumer: wait(full); wait(mutex); txn = dequeue(); signal(mutex); signal(empty)' : 'Producer: enqueue(txn)        // no wait, no lock\nConsumer: txn = dequeue()      // two tellers may take the same item'}</pre></section>
+      <section className="card"><h2>Event log</h2><ol className="log">${s.log.slice(0, 30).map((e, k) => html`<li key=${k} className=${e.k === 'lost' ? 'deny' : e.k === 'block' ? 'wait' : e.k === 'cons' ? 'done' : 'enq'}><i></i><span>${e.m}</span></li>`)}${!s.log.length ? html`<li><span className="muted">Press Start.</span></li>` : null}</ol></section></div></div>`;
+}
+
+/* ---------- Deadlock guard ---------- */
+const BK = {
+  safe: { procs: ['T1', 'T2', 'T3', 'T4', 'T5'], total: [10, 5, 7], alloc: [[0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]], max: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]] },
+  unsafe: { procs: ['T1', 'T2', 'T3'], total: [8, 2, 2], alloc: [[3, 1, 0], [3, 0, 1], [1, 0, 0]], max: [[6, 2, 1], [6, 1, 2], [5, 2, 2]] },
+};
+function Deadlock({}) {
+  const [d, setD] = useState(BK.safe); const [rp, setRp] = useState(0); const [rv, setRv] = useState([1, 0, 2]); const [msg, setMsg] = useState(null);
+  const need = d.max.map((m, i) => m.map((v, j) => v - d.alloc[i][j]));
+  const avail = d.total.map((t, j) => t - d.alloc.reduce((s, r) => s + r[j], 0));
+  const sf = Engine.safety(d.procs, d.alloc, need, avail);
+  const setCell = (k, i, j, v) => setD({ ...d, [k]: d[k].map((r, a) => (a === i ? r.map((c, b) => (b === j ? ival(v) : c)) : r)) });
+  const bad = avail.some((a) => a < 0) || need.some((r) => r.some((v) => v < 0));
+  const request = () => { const r = Engine.bankerRequest(d.procs, d.alloc, d.max, avail, rp, rv);
+    if (r.ok) { setD({ ...d, alloc: r.alloc }); setMsg({ tone: 'ok', t: `Granted. The new state is safe: <${r.seq.join(', ')}>.` }); }
+    else setMsg({ tone: 'bad', t: { 'exceeds-need': `Denied: ${d.procs[rp]} asked for more than its declared maximum.`, unavailable: `Denied: not enough available (${avail.join(', ')}). ${d.procs[rp]} waits.`, unsafe: `Denied: granting this would leave no safe sequence, so ${d.procs[rp]} waits instead.` }[r.code] }); };
+  const mat = (title, key) => html`<div><h3>${title}</h3><div className="tw"><table className="edit"><thead><tr><th></th>${RES_SHORT.map((r) => html`<th key=${r}>${r}</th>`)}</tr></thead><tbody>${d[key].map((row, i) => html`<tr key=${i}><td><${Chip} id=${d.procs[i]} /></td>${row.map((c, j) => html`<td key=${j}><input type="number" min="0" aria-label=${`${key} ${d.procs[i]} ${RES_SHORT[j]}`} value=${c} onChange=${(e) => setCell(key, i, j, e.target.value)} /></td>`)}</tr>`)}</tbody></table></div></div>`;
+  return html`<div className="page">
+    <${Head} eyebrow="Module 3" title="Deadlock guard" sub="Before a transaction receives database connections, core threads or printer units, Banker's Algorithm checks that a safe order of completion still exists." right=${html`<${Pill} tone=${bad ? 'warn' : sf.safe ? 'ok' : 'bad'}>${bad ? 'check inputs' : sf.safe ? 'safe state' : 'unsafe state'}<//>`} />
+    <section className="card"><div className="row wrap"><button className="btn" onClick=${() => { setD(BK.safe); setMsg(null); }}>Load safe example</button><button className="btn" onClick=${() => { setD(BK.unsafe); setMsg(null); setRp(0); }}>Load unsafe example</button>
+      ${d.total.map((t, j) => html`<${Num} key=${j} id=${'bk-t' + j} label=${`Total ${RES_SHORT[j]}`} value=${t} onChange=${(v) => setD({ ...d, total: d.total.map((x, k) => (k === j ? v : x)) })} />`)}</div>
+      <div className="three mt">${mat('Allocation', 'alloc')}${mat('Maximum', 'max')}<div><h3>Need (derived)</h3><div className="tw"><table><thead><tr><th></th>${RES_SHORT.map((r) => html`<th key=${r}>${r}</th>`)}</tr></thead><tbody>${need.map((r, i) => html`<tr key=${i}><td><${Chip} id=${d.procs[i]} /></td>${r.map((v, j) => html`<td key=${j} className=${v < 0 ? 'neg' : ''}>${v}</td>`)}</tr>`)}</tbody></table></div><h3 className="mt">Available</h3><div className="row">${avail.map((a, j) => html`<span key=${j} className=${'av mono' + (a < 0 ? ' neg' : '')}>${RES_SHORT[j]} ${a}</span>`)}</div></div></div></section>
+    <div className="two"><section className="card"><h2>Safety check</h2>${sf.safe ? html`<p className="ok-line"><${Pill} tone="ok">Safe<//> Sequence: <b className="mono">&lt;${sf.seq.join(', ')}&gt;</b></p>` : html`<p className="ok-line"><${Pill} tone="bad">Unsafe<//> ${sf.seq.length ? `Only ${sf.seq.join(', ')} can finish; the rest could deadlock.` : 'No transaction can finish with what is available.'}</p>`}
+      <div className="tw"><table><thead><tr><th>Step</th><th>Txn</th><th>Need</th><th>Work before</th><th>Work after</th></tr></thead><tbody>${sf.steps.map((s, k) => html`<tr key=${k}><td>${k + 1}</td><td><${Chip} id=${s.p} /></td><td className="mono">${s.need.join(', ')}</td><td className="mono">${s.before.join(', ')}</td><td className="mono">${s.after.join(', ')}</td></tr>`)}${!sf.steps.length ? html`<tr><td colSpan="5" className="muted">No step is possible.</td></tr>` : null}</tbody></table></div></section>
+      <section className="card"><h2>Try a request</h2><div className="row wrap"><label className="fld"><span>Transaction</span><select id="bk-p" value=${rp} onChange=${(e) => setRp(Number(e.target.value))}>${d.procs.map((p, i) => html`<option key=${p} value=${i}>${p}</option>`)}</select></label>
+        ${rv.map((v, j) => html`<${Num} key=${j} id=${'bk-r' + j} label=${RES_SHORT[j]} value=${v} onChange=${(x) => setRv(rv.map((y, k) => (k === j ? x : y)))} />`)}<button className="btn pri" onClick=${request}>Check and grant</button></div>
+        ${msg ? html`<p className="ok-line mt"><${Pill} tone=${msg.tone}>${msg.tone === 'ok' ? 'Granted' : 'Held'}<//> ${msg.t}</p>` : html`<small className="muted">Granted requests update the Allocation matrix.</small>`}</section></div></div>`;
+}
+
+/* ---------- Memory manager ---------- */
+function Memory({ txns, cfg, setCfg, go }) {
+  if (!txns.length) return html`<${Empty} go=${go} />`;
+  const reqs = txns.map((x) => ({ id: x.id, mem: x.mem }));
+  const res = { first: Engine.memBatch(cfg.parts, reqs, 'first'), best: Engine.memBatch(cfg.parts, reqs, 'best') };
+  const setPart = (i, v) => setCfg({ ...cfg, parts: cfg.parts.map((p, j) => (j === i ? Math.max(10, v) : p)) });
+  return html`<div className="page">
+    <${Head} eyebrow="Module 4" title="Memory manager" sub="Each transaction session needs a block of memory. First Fit takes the first hole that is big enough; Best Fit takes the smallest one." right=${html`<${Pill} tone="info">live bank uses ${cfg.fit === 'first' ? 'First' : 'Best'} Fit<//>`} />
+    <section className="card"><h2>Memory partitions <small>KB</small></h2><div className="row wrap">${cfg.parts.map((p, i) => html`<div className="pe" key=${i}><${Num} id=${'part' + i} label=${'P' + i} min=${10} w=${74} value=${p} onChange=${(v) => setPart(i, v)} />${cfg.parts.length > 1 ? html`<button className="ib" title=${'Remove P' + i} onClick=${() => setCfg({ ...cfg, parts: cfg.parts.filter((_, j) => j !== i) })}>✕</button>` : null}</div>`)}<button className="btn" onClick=${() => setCfg({ ...cfg, parts: [...cfg.parts, 256] })}>Add partition</button><button className="btn" onClick=${() => setCfg({ ...cfg, parts: DEFAULT_CFG.parts })}>Reset</button></div>
+      <div className="row mt"><small className="muted">Requests, in arrival order: ${reqs.map((r) => `${r.id} ${r.mem}`).join(' · ')}</small></div></section>
+    <div className="two">${['first', 'best'].map((f) => { const r = res[f]; return html`<section className="card" key=${f}><h2>${f === 'first' ? 'First Fit' : 'Best Fit'} ${r.unserved ? html`<${Pill} tone="bad">${r.unserved} unserved<//>` : html`<${Pill} tone="ok">all served<//>`}</h2>
+      <${MemMap} mem=${r.mem} />
+      <div className="kpis mini"><${Kpi} label="Free" value=${r.stats.free} unit=" KB" /><${Kpi} label="Largest hole" value=${r.stats.largest} unit=" KB" /><${Kpi} label="Fragmentation" value=${fmt(r.stats.external, 0)} unit="%" /></div>
+      <ol className="log">${r.log.map((l) => html`<li key=${l.id} className=${l.ok ? 'admit' : 'deny'}><span className="mono">${l.id}</span><i></i><span>${l.ok ? `${l.size} KB into P${l.part}, ${l.leftover} KB of that hole left` : `${l.size} KB: no hole is large enough, so it waits`}</span></li>`)}</ol></section>`; })}</div>
+    <small className="muted">Fragmentation = share of free memory that is not in the largest hole. Higher means free memory is scattered in pieces.</small></div>`;
+}
+
+/* ---------- Report and tests ---------- */
+function runTests() {
+  const out = [];
+  const rep = SCENARIOS.report.txns;
+  const c = Engine.simulateCPU('prio-p', rep, 2);
+  out.push({ id: 'TC1', name: 'Preemptive priority on the report workload', expect: 'Avg WT 4.2 ms, Avg TAT 7.2 ms, T2 preempts T1 at t=2', got: `Avg WT ${fmt(c.metrics.avgWT)}, Avg TAT ${fmt(c.metrics.avgTAT)}, first switch at ${c.blocks[1].start}`, pass: Math.abs(c.metrics.avgWT - 4.2) < 1e-9 && Math.abs(c.metrics.avgTAT - 7.2) < 1e-9 && c.blocks[1].pid === 'T2' && c.blocks[1].start === 2 });
+  const b = BK.safe; const need = b.max.map((m, i) => m.map((v, j) => v - b.alloc[i][j])); const av = b.total.map((t, j) => t - b.alloc.reduce((s, r) => s + r[j], 0));
+  const sf = Engine.safety(b.procs, b.alloc, need, av);
+  out.push({ id: 'TC2', name: "Banker's safety check, 5 transactions x 3 resources", expect: 'Safe, sequence T2, T4, T5, T1, T3', got: `${sf.safe ? 'Safe' : 'Unsafe'}, ${sf.seq.join(', ')}`, pass: sf.safe && sf.seq.join() === 'T2,T4,T5,T1,T3' });
+  const rq = Engine.bankerRequest(b.procs, b.alloc, b.max, av, 0, [7, 4, 3]);
+  out.push({ id: 'TC3', name: 'T1 requests (7,4,3) with Available (3,3,2)', expect: 'Denied, T1 waits', got: rq.ok ? 'Granted' : 'Denied (' + rq.code + ')', pass: !rq.ok });
+  const us = BK.unsafe; const un = us.max.map((m, i) => m.map((v, j) => v - us.alloc[i][j])); const ua = us.total.map((t, j) => t - us.alloc.reduce((s, r) => s + r[j], 0));
+  out.push({ id: 'TC4', name: 'Unsafe state is detected', expect: 'No safe sequence', got: Engine.safety(us.procs, us.alloc, un, ua).safe ? 'Safe' : 'Unsafe', pass: !Engine.safety(us.procs, us.alloc, un, ua).safe });
+  const rm = [212, 417, 112, 426].map((m, i) => ({ id: 'T' + (i + 1), mem: m }));
+  const ff = Engine.memBatch([100, 500, 200, 300, 600], rm, 'first'), bf = Engine.memBatch([100, 500, 200, 300, 600], rm, 'best');
+  out.push({ id: 'TC5', name: 'First Fit vs Best Fit on blocks 100/500/200/300/600', expect: 'First Fit leaves T4 unserved; Best Fit serves all four', got: `First Fit unserved ${ff.unserved}, Best Fit unserved ${bf.unserved}`, pass: ff.unserved === 1 && ff.log[3].ok === false && bf.unserved === 0 });
+  const s = Engine.newSync(); let ok = true; for (let i = 0; i < 4000; i++) { Engine.syncTick(s, { cap: 4, consumers: 3, pProd: 0.7, pCons: 0.4, safe: true, channels: 4 }, Math.random); if (s.buf.length > 4) ok = false; }
+  out.push({ id: 'TC6', name: 'Protected buffer over 4,000 random steps', expect: 'Never above capacity; nothing lost or doubled', got: `peak ${s.peak} of 4, lost ${s.lost + s.underflow}, doubled ${s.dup}`, pass: ok && s.lost === 0 && s.dup === 0 && s.underflow === 0 });
+  const sim = Engine.simulateBank(rep, { ...DEFAULT_CFG });
+  const tot = DEFAULT_CFG.resTotal; const inv = sim.snaps.every((q) => q.avail.every((v, j) => v >= 0 && v <= tot[j]) && q.mem.every((p) => p.used.every((u) => u.off >= 0 && u.off + u.size <= p.size)));
+  out.push({ id: 'TC7', name: 'Integrated run on the report workload', expect: 'All 5 finish; resources stay within totals; sessions stay inside partitions', got: `${sim.rows.filter((r) => r.ct != null).length} finished, invariants ${inv ? 'held' : 'broken'}`, pass: sim.stuck.length === 0 && inv });
+  return out;
+}
+function Report({ txns, cpuAll, bank, cfg, scenarioName }) {
+  const [tests, setTests] = useState(null); const [copied, setCopied] = useState('');
+  useEffect(() => { setTests(runTests()); }, []);
+  const summary = () => `BankOS summary - ${scenarioName}\n` + txns.length + ' transactions\n' + cpuAll.map((c) => `${c.a.name}: avg WT ${fmt(c.m.avgWT)} ms, avg TAT ${fmt(c.m.avgTAT)} ms, ${c.m.ctx} switches`).join('\n') + `\nIntegrated (${POLICIES.find((p) => p.id === cfg.policy).name}, ${cfg.fit} fit): avg TAT ${fmt(bank.stats.avgTAT)} ms, avg gate wait ${fmt(bank.stats.avgGate)} ms, Banker holds ${bank.stats.bankerWaits}, peak buffer ${bank.stats.peak}/${cfg.bufferCap}`;
+  const copy = () => { const t = summary(); const done = () => { setCopied('Copied'); setTimeout(() => setCopied(''), 1800); }; try { navigator.clipboard.writeText(t).then(done, () => setCopied('Select the text below and copy it')); } catch (e) { setCopied('Select the text below and copy it'); } };
+  const passN = tests ? tests.filter((t) => t.pass).length : 0;
+  return html`<div className="page">
+    <${Head} eyebrow="Evidence" title="Report and tests" sub="These checks run in your browser against the real engine. They back the numbers in the written report." right=${tests ? html`<${Pill} tone=${passN === tests.length ? 'ok' : 'bad'}>${passN}/${tests.length} passing<//>` : null} />
+    <section className="card"><div className="row"><h2 className="grow">Self-tests</h2><button className="btn" onClick=${() => setTests(runTests())}>Run again</button></div>
+      <div className="tw"><table><thead><tr><th>#</th><th>Check</th><th>Expected</th><th>Measured</th><th></th></tr></thead><tbody>${(tests || []).map((t) => html`<tr key=${t.id}><td className="mono">${t.id}</td><td>${t.name}</td><td>${t.expect}</td><td className="mono">${t.got}</td><td><${Pill} tone=${t.pass ? 'ok' : 'bad'}>${t.pass ? 'Pass' : 'Fail'}<//></td></tr>`)}</tbody></table></div></section>
+    <section className="card"><div className="row"><h2 className="grow">Current workload summary</h2><button className="btn pri" onClick=${copy}>Copy summary</button>${copied ? html`<small className="muted">${copied}</small>` : null}</div><pre className="code sel">${summary()}</pre></section>
+    <section className="card"><h2>Problem 5 mapping</h2><div className="tw"><table><thead><tr><th>OS concept</th><th>Where it acts in the bank</th><th>Module</th></tr></thead><tbody>
+      <tr><td>CPU scheduling</td><td>Fraud checks preempt routine deposits</td><td>CPU scheduler</td></tr><tr><td>Producer-consumer</td><td>Channels fill a bounded request buffer; tellers drain it</td><td>Sync lab</td></tr>
+      <tr><td>Banker's Algorithm</td><td>Database, thread and printer claims are granted only in safe states</td><td>Deadlock guard</td></tr><tr><td>Memory management</td><td>Each session gets a block by First or Best Fit</td><td>Memory manager</td></tr></tbody></table></div></section></div>`;
+}
+
+/* ---------- Shell ---------- */
+function App() {
+  const saved = useRef(lsGet('bankos.v1') || {}).current;
+  const [txns, setTxns] = useState(saved.txns || SCENARIOS.report.txns);
+  const [scenario, setScenario] = useState(saved.scenario || 'report');
+  const [cfg, setCfg] = useState({ ...DEFAULT_CFG, ...(saved.cfg || {}) });
+  const [algo, setAlgo] = useState('prio-p');
+  const [theme, setTheme] = useState(saved.theme || 'system');
+  const [page, setPage] = useState(() => { const h = typeof location !== 'undefined' ? location.hash.replace('#', '') : ''; return PAGES.includes(h) ? h : 'overview'; });
+  const go = useCallback((p) => { setPage(p); try { location.hash = p; } catch (e) { /* ignore */ } }, []);
+  useEffect(() => { const f = () => { const h = location.hash.replace('#', ''); if (PAGES.includes(h)) setPage(h); }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
+  useEffect(() => { lsSet('bankos.v1', { txns, scenario, cfg, theme }); }, [txns, scenario, cfg, theme]);
+  useEffect(() => { const r = document.documentElement; if (theme === 'system') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', theme); }, [theme]);
+  TYPEMAP = useMemo(() => Object.fromEntries(txns.map((x) => [x.id, x.type])), [txns]);
+  const cpuAll = useMemo(() => Engine.ALGOS.map((a) => { const r = Engine.simulateCPU(a.id, txns, cfg.quantum); return { a, r, m: r.metrics }; }), [txns, cfg.quantum]);
+  const bank = useMemo(() => Engine.simulateBank(txns, cfg), [txns, cfg]);
+  const scenarioName = (SCENARIOS[scenario] || { name: 'Custom' }).name;
+  const nextTheme = { system: 'light', light: 'dark', dark: 'system' }[theme];
+  const label = (NAV.flatMap((g) => g.items).find((i) => i[0] === page) || [])[1];
+  let body;
+  if (page === 'overview') body = html`<${Overview} txns=${txns} cpuAll=${cpuAll} bank=${bank} cfg=${cfg} go=${go} scenarioName=${scenarioName} />`;
+  else if (page === 'live') body = html`<${Live} txns=${txns} bank=${bank} cfg=${cfg} setCfg=${setCfg} go=${go} />`;
+  else if (page === 'workload') body = html`<${Workload} txns=${txns} setTxns=${(t) => { setTxns(t); if (!t.length) return; }} cfg=${cfg} scenario=${scenario} setScenario=${setScenario} />`;
+  else if (page === 'cpu') body = html`<${CPU} txns=${txns} cpuAll=${cpuAll} cfg=${cfg} setCfg=${setCfg} algo=${algo} setAlgo=${setAlgo} go=${go} />`;
+  else if (page === 'sync') body = html`<${Sync} />`;
+  else if (page === 'deadlock') body = html`<${Deadlock} />`;
+  else if (page === 'memory') body = html`<${Memory} txns=${txns} cfg=${cfg} setCfg=${setCfg} go=${go} />`;
+  else body = html`<${Report} txns=${txns} cpuAll=${cpuAll} bank=${bank} cfg=${cfg} scenarioName=${scenarioName} />`;
+  return html`<div className="app">
+    <aside className="side"><div className="brand"><span className="logo mono">B/OS</span><div><b>BankOS</b><small>Banking and ATM platform</small></div></div>
+      <nav>${NAV.map((g) => html`<div className="ng" key=${g.g}><div className="gl">${g.g}</div>${g.items.map((i) => html`<button key=${i[0]} className=${page === i[0] ? 'on' : ''} aria-current=${page === i[0] ? 'page' : undefined} onClick=${() => go(i[0])}>${i[1]}</button>`)}</div>`)}</nav>
+      <div className="sfoot"><div className="gl">Workload</div><b>${scenarioName}</b><small>${txns.length} transactions</small></div></aside>
+    <main><div className="top"><span className="crumb mono">bankos / ${label}</span><button className="btn" onClick=${() => setTheme(nextTheme)} title="Switch theme">Theme: ${theme}</button></div>${body}</main></div>`;
+}
+if (typeof document !== 'undefined' && document.getElementById('root')) ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
+
+</script>
